@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Meester Database</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    input { padding: 8px; margin-right: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Search the Meester Database</h1>
+
+  <input id="searchBox" type="text" placeholder="Type a team, player, or venue" />
+  <button onclick="search()">Search</button>
+
+  <h2>Results</h2>
+  <div id="results"></div>
+
+ <script>
+  let currentSort = { column: null, ascending: true };
+  let fullResults = {};
+  let rowsPerPage = 25;
+  let currentPage = {};
+
+  document.getElementById('searchBox').addEventListener('input', () => {
+    search();
+  });
+
+  async function search() {
+    const query = document.getElementById('searchBox').value.trim();
+    const endpoints = [
+      `/teams?name=${query}`,
+      `/players?name=${query}`,
+      `/venues?name=${query}`
+    ];
+
+    fullResults = {};
+    currentPage = {};
+    let html = '';
+
+    for (const url of endpoints) {
+      const type = url.split('?')[0].slice(1);
+      const res = await fetch(`http://localhost:3001${url}`);
+      const data = await res.json();
+
+      if (data.length === 0) continue;
+
+      fullResults[type] = data;
+      currentPage[type] = 1;
+
+      html += `<h3>${type} results</h3>`;
+      html += renderTable(type);
+    }
+
+    document.getElementById('results').innerHTML = html || '<p>No results found.</p>';
+  }
+
+  function renderTable(type) {
+    const data = fullResults[type];
+    const page = currentPage[type];
+    const start = (page - 1) * rowsPerPage;
+    const pageData = data.slice(start, start + rowsPerPage);
+    const keys = Object.keys(data[0]);
+
+    let header = keys.map(key =>
+      `<th onclick="sortTable('${type}', '${key}')">${key} &#x25B2;&#x25BC;</th>`
+    ).join('');
+
+    let rows = pageData.map(row =>
+      '<tr>' + keys.map(k => `<td>${row[k]}</td>`).join('') + '</tr>'
+    ).join('');
+
+    const totalPages = Math.ceil(data.length / rowsPerPage);
+    const pagination = `
+      <div style="margin-top:10px">
+        Page ${page} of ${totalPages}
+        <button onclick="changePage('${type}', -1)" ${page === 1 ? 'disabled' : ''}>Prev</button>
+        <button onclick="changePage('${type}', 1)" ${page === totalPages ? 'disabled' : ''}>Next</button>
+      </div>`;
+
+    return `
+      <table id="${type}">
+        <thead><tr>${header}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${pagination}`;
+  }
+
+  function changePage(type, delta) {
+    currentPage[type] += delta;
+    const html = renderTable(type);
+    const section = document.querySelector(`h3:contains('${type} results')`);
+    section.nextElementSibling.outerHTML = html;
+  }
+
+  function sortTable(type, column) {
+    const data = fullResults[type];
+    const ascending = (currentSort.column !== column) ? true : !currentSort.ascending;
+    currentSort = { column, ascending };
+
+    data.sort((a, b) => {
+      const valA = isNaN(a[column]) ? (a[column] || '').toString().toLowerCase() : parseFloat(a[column]);
+      const valB = isNaN(b[column]) ? (b[column] || '').toString().toLowerCase() : parseFloat(b[column]);
+
+      if (valA < valB) return ascending ? -1 : 1;
+      if (valA > valB) return ascending ? 1 : -1;
+      return 0;
+    });
+
+    fullResults[type] = data;
+    const html = renderTable(type);
+    const section = document.querySelector(`h3:contains('${type} results')`);
+    section.nextElementSibling.outerHTML = html;
+  }
+</script>
+
+</body>
+</html>
