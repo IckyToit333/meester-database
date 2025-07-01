@@ -42,7 +42,7 @@
 
     for (const url of endpoints) {
       const type = url.split('?')[0].slice(1);
-      const res = await fetch(`http://localhost:3001${url}`);
+      const res = await fetch(`https://meester-database.onrender.com${url}`);
       const data = await res.json();
 
       if (data.length === 0) continue;
